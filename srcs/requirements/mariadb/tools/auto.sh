@@ -1,37 +1,27 @@
-#!/bin/bash
-set -eu
-
-DB_NAME=wordpress
-DB_USER=mobouifr
-DB_PASSWORD=wppassword
-DB_PASS_ROOT=rootpassword
+#!/bin/sh
 
 mkdir -p /run/mysqld
-chown -R  mysql:mysql /run/mysqld
+chown -R mysql:mysql /run/mysqld
 
-# Start MariaDB in the background to create users and DB
-mysqld --skip-networking --user=mysql &
-pid="$!"
+if [ ! -d "/var/lib/mysql/mysql" ]; then
+	
+	chown -R mysql:mysql /var/lib/mysql
 
-# Wait until MariaDB is ready
-until mariadb -u root -e "SELECT 1;" >/dev/null 2>&1; do
-    sleep 1
-done
+	mysql_install_db --basedir=/usr --datadir=/var/lib/mysql --user=mysql --rpm > /dev/null 2>&1
 
-# Only create DB/user if first run
-if [ ! -f "/var/lib/mysql/.initialized" ]; then
-    mariadb -u root <<EOF
-CREATE DATABASE IF NOT EXISTS $DB_NAME;
-CREATE USER IF NOT EXISTS '$DB_USER'@'%' IDENTIFIED BY '$DB_PASSWORD';
-GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'%';
-ALTER USER 'root'@'localhost' IDENTIFIED BY '$DB_PASS_ROOT';
-FLUSH PRIVILEGES;
-EOF
-    touch /var/lib/mysql/.initialized
+    echo "
+    USE mysql;
+    FLUSH PRIVILEGES;
+    DELETE FROM mysql.user WHERE User='';
+    DROP DATABASE test;
+    DELETE FROM mysql.db WHERE Db='test';
+    DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
+    ALTER USER 'root'@'localhost' IDENTIFIED BY '$DB_PASS_ROOT';
+    CREATE DATABASE \`$DB_NAME\` CHARACTER SET utf8 COLLATE utf8_general_ci;
+    CREATE USER '$DB_USER'@'%' IDENTIFIED BY '$DB_PASSWORD';
+    GRANT ALL PRIVILEGES ON \`$DB_NAME\`.* TO '$DB_USER'@'%';
+    FLUSH PRIVILEGES;
+    " | mysqld --user=mysql --bootstrap 
 fi
 
-# Stop background MariaDB safely
-mysqladmin -u root -p"$DB_PASS_ROOT" shutdown 2>/dev/null || kill "$pid" || true
-
-# Start MariaDB as PID 1
-exec mysqld --user=mysql
+exec mysqld --user=mysql --console
