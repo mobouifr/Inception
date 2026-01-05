@@ -1,19 +1,23 @@
 #!/bin/sh
 
+# Exit on error and undefined variables
 set -eu
 
 echo "Reading secrets..."
 
+# Ensure database user password secret exists
 if [ ! -f /run/secrets/db_password ]; then
     echo "ERROR: db_password secret not found!"
     exit 1
 fi
 
+# Ensure WordPress admin password secret exists
 if [ ! -f /run/secrets/wp_admin_password ]; then
     echo "ERROR: wp_admin_password secret not found!"
     exit 1
 fi
 
+# Ensure additional author user password secret exists
 if [ ! -f /run/secrets/wp_user_password ]; then
     echo "ERROR: wp_user_password secret not found!"
     exit 1
@@ -27,6 +31,7 @@ WP_USER_PASSWORD=$(cat /run/secrets/wp_user_password)
 
 echo "Secrets loaded successfully!"
 
+# Download WordPress core files if not already present
 if [ ! -f wp-settings.php ]; then
     echo ">>>>>>>>>>>>>>Downloading WordPress..."
     wp core download --allow-root
@@ -35,6 +40,7 @@ else
 fi
 
 
+# Wait until MariaDB is reachable using provided credentials
 echo ">>>>>>>>>>>>>>Waiting for mariadb..."
 while ! /usr/bin/mariadb-admin ping -h "${DB_HOST}" -u "${DB_USER}" -p"${DB_PASSWORD}" --silent; do
 	echo ">>>>>>>>>>>>>>Database is unavailable - sleeping..."
@@ -42,6 +48,7 @@ while ! /usr/bin/mariadb-admin ping -h "${DB_HOST}" -u "${DB_USER}" -p"${DB_PASS
 done
 
 
+# Create wp-config.php and security settings on first run
 if [ ! -f wp-config.php ]; then
     echo "Creating wp-config.php..."
     
@@ -75,6 +82,7 @@ else
 fi
 
 
+# Install WordPress core with admin account if not yet installed
 if ! wp core is-installed --allow-root; then
     echo ">>>>>>>>>>>>>>Installing Wordpress..."
         wp core install \
@@ -93,6 +101,7 @@ fi
 # ================================================================
 # CREATE ADDITIONAL AUTHOR USER
 # ================================================================
+# Create an extra author user if WP_USER / WP_USER_EMAIL are defined
 if [ -n "${WP_USER:-}" ] && [ -n "${WP_USER_EMAIL:-}" ]; then
     if ! wp user get "${WP_USER}" --field=ID --allow-root >/dev/null 2>&1; then
         echo "Creating additional WordPress user ${WP_USER} with role ${WP_ROLE:-author}..."
@@ -109,6 +118,7 @@ fi
 # ================================================================
 # FIX PERMISSIONS (MOVED TO END, BEFORE PHP-FPM STARTS)
 # ================================================================
+# Ensure correct file ownership and permissions for WordPress files
 echo ">>> Fixing file permissions..."
 chown -R www-data:www-data /var/www/html/
 find /var/www/html/ -type d -exec chmod 755 {} \;
