@@ -41,30 +41,38 @@ In this repository, Compose volumes are configured as **bind mounts** (via `driv
 - `/home/mobouifr/data/www` (WordPress files)
 - `/home/mobouifr/data/mariadb` (MariaDB data)
 
-## Instructions
+## Getting Started
+
 ### Prerequisites
 - Docker Engine
-- Docker Compose v2 (`docker compose`)
+- Docker Compose v2
 - GNU Make
+- Add this line to your /etc/hosts file:
+  127.0.0.1 mobouifr.42.fr
 
-### Build and run
-All commands are available through the root `Makefile`:
+### Setup
+1. Clone the repository:
+	git clone https://github.com/mobouifr/inception.git
+	cd inception
 
-- First run:
-	- `make`
-- Stop:
-	- `make down`
-- Restart:
-	- `make restart`
-- Rebuild (down + init + build + up):
-	- `make rebuild`
+2. Copy the example secrets and fill in your own values:
+	cp -r secrets.example/ secrets/
+	Open each file inside secrets/ and replace the placeholder with any value you want.
+	For local testing, anything works - e.g. just type "password123".
 
-### Access
-- Website (HTTPS): `https://mobouifr.42.fr`
-- WordPress admin: `https://mobouifr.42.fr/wp-admin`
+3. Build and run the stack:
+	make
 
-If your environment does not resolve `mobouifr.42.fr`, add a local hosts entry:
-- `/etc/hosts`: `<IP_ADDRESS> mobouifr.42.fr`
+4. Open your browser and go to:
+	https://mobouifr.42.fr
+	WordPress admin panel:
+	https://mobouifr.42.fr/wp-admin
+
+### Stop the stack
+  make down
+
+### Rebuild everything from scratch
+  make rebuild
 
 ## Resources
 ### Classic references
