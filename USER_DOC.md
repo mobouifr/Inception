@@ -1,95 +1,61 @@
 # User Documentation (Inception)
 
-## Overview: What This Stack Provides
-This project deploys a small web stack using Docker Compose:
+## What This Stack Provides
+Inception deploys three containers with Docker Compose:
 
-- **Nginx**: TLS termination (HTTPS on port `443`) and reverse proxy.
-- **WordPress (PHP-FPM)**: the application (site + admin panel).
-- **MariaDB**: the database used by WordPress.
+- NGINX terminates HTTPS on port `443` and proxies requests to WordPress.
+- WordPress runs with PHP-FPM only; there is no NGINX inside the application container.
+- MariaDB stores the WordPress database.
 
-All containers are attached to a dedicated Docker bridge network (`my-net`) so services can reach each other by name (e.g., `mariadb`).
+The containers share a custom bridge network called `my-net`, so they can reach each other by service name.
 
-## Start / Stop
-All lifecycle operations are exposed through the root `Makefile`.
+## Start, Stop, Restart
+Use the root `Makefile` for all common operations:
 
-- Start (first time or after changes):
-  - `make`
-- Stop containers:
-  - `make down`
-- Restart containers:
-  - `make restart`
-- Rebuild images and relaunch:
-  - `make rebuild`
+```sh
+make          # first build and run
+make down     # stop all containers
+make restart  # restart the stack
+make rebuild  # full teardown + rebuild
+```
 
-Notes:
-- `make init` creates the host directories used for persistent storage:
-  - `/home/mobouifr/data/www`
-  - `/home/mobouifr/data/mariadb`
+`make` also creates the host storage directories used by the stack:
 
-## Access the Website and Admin Panel
-### Website
-- HTTPS endpoint is published by Nginx on the host:
-  - `https://mobouifr.42.fr` (based on `srcs/.env`)
+- `/home/mobouifr/data/www`
+- `/home/mobouifr/data/mariadb`
 
-If DNS is not available in your environment, add a hosts entry pointing to the machine running Docker:
-- `/etc/hosts`:
-  - `<IP_ADDRESS>  mobouifr.42.fr`
+## Open the Site
+After the stack starts, open:
 
-### WordPress Admin
-- Admin panel:
-  - `https://mobouifr.42.fr/wp-admin`
+- https://mobouifr.42.fr
+- https://mobouifr.42.fr/wp-admin
 
-Credentials are defined through environment variables and Docker secrets (see next section).
+If the domain does not resolve, add a hosts entry that points to your VM IP:
 
-## Locate and Manage Credentials
-This project uses **Docker secrets** (files) for passwords and **environment variables** for non-sensitive configuration.
+```sh
+<VM_IP> mobouifr.42.fr
+```
 
-### Secrets (passwords)
-Stored as files under `secrets/` and mounted into containers by Docker Compose:
+## Secrets and Settings
+Passwords are stored as Docker secrets from the `secrets/` folder.
 
-- `secrets/db_password.txt` (database user password)
-- `secrets/db_root_password.txt` (MariaDB root password)
-- `secrets/wp_admin_password.txt` (WordPress admin password)
-- `secrets/wp_user_password.txt` (WordPress user password)
+- `secrets/db_password.txt`
+- `secrets/db_root_password.txt`
+- `secrets/wp_admin_password.txt`
+- `secrets/wp_user_password.txt`
 
-To rotate a password:
-1. Edit the relevant file in `secrets/`.
-2. Recreate containers so the new secret is used:
-   - `make down && make up`
+The `secrets/` directory is git-ignored and must be created from `secrets.example/`:
 
-### Environment variables (non-sensitive)
-The main Compose variables are in `srcs/.env` (domain name, WordPress usernames/emails, DB name/user, certificate subject fields, etc.).
+```sh
+cp -r secrets.example/ secrets/
+```
 
-If you change `srcs/.env`, recreate containers:
-- `make down && make up`
+The WordPress admin username must not contain `admin` or `administrator`.
 
-## Check That Services Are Running Correctly
-### Via Docker
-- List containers:
-  - `docker ps`
-- Check logs:
-  - `docker logs nginx`
-  - `docker logs wordpress`
-  - `docker logs mariadb`
+## Persistence
+The project keeps its data on the host using named volumes backed by bind mount driver options:
 
-### Quick functional checks
-- HTTPS responds:
-  - `curl -kI https://mobouifr.42.fr`
-- WordPress admin reachable:
-  - `curl -kI https://mobouifr.42.fr/wp-admin`
+- WordPress files: `/home/mobouifr/data/www` -> `/var/www/html`
+- MariaDB data: `/home/mobouifr/data/mariadb` -> `/var/lib/mysql`
 
-If WordPress shows database connection errors, check MariaDB logs first:
-- `docker logs mariadb`
-
-## Where Data Lives (Persistence)
-This project persists data on the host using bind-mounted directories (declared as Docker “volumes” with `driver_opts: { type: none, o: bind }`):
-
-- WordPress files:
-  - Host: `/home/mobouifr/data/www`
-  - Container: `/var/www/html`
-- MariaDB data:
-  - Host: `/home/mobouifr/data/mariadb`
-  - Container: `/var/lib/mysql`
-
-To remove *all* persisted data (destructive):
-- `make fclean`
+If you need to reset the stack completely, use `make rebuild` and remove the host data directories only if you want a full data wipe.

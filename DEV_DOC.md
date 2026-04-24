@@ -1,91 +1,66 @@
 # Developer Documentation (Inception)
 
-## Environment Setup From Scratch
+## Environment Setup
 ### Prerequisites
 - Docker Engine
-- Docker Compose v2 (`docker compose`)
+- Docker Compose v2
 - GNU Make
-- A Linux environment matching the project paths used in the Makefile:
-  - `/home/mobouifr/data/www`
-  - `/home/mobouifr/data/mariadb`
+- A Linux virtual machine that can use the host paths required by the Makefile
 
 ### Configuration Files
 - Compose file: `srcs/docker-compose.yml`
-- Environment variables file: `srcs/.env`
+- Local non-sensitive configuration: `srcs/.env`
 - Secrets directory: `secrets/`
 
 ### Secrets
-Passwords are provided via Docker secrets (file-based):
+The stack reads passwords from Docker secrets mounted from files:
+
 - `secrets/db_password.txt`
 - `secrets/db_root_password.txt`
 - `secrets/wp_admin_password.txt`
 - `secrets/wp_user_password.txt`
 
-Keep these out of logs and avoid committing real credentials.
+Keep real values out of the repository. The `secrets/` directory is git-ignored and must be created from `secrets.example/`.
 
 ## Build and Launch
-Use the root `Makefile` as the single entry-point:
+The root `Makefile` is the supported entry point:
 
-- Initialize host directories (persistence paths):
-  - `make init`
-- Build images:
-  - `make build`
-- Launch in detached mode:
-  - `make up`
-- Full pipeline (init + build + up):
-  - `make`
+```sh
+make          # first build and run
+make down     # stop all containers
+make restart  # restart the stack
+make rebuild  # full teardown + rebuild
+```
 
-The Makefile uses:
-- `docker compose -f srcs/docker-compose.yml ...`
+Under the hood, the Makefile runs `docker compose -f srcs/docker-compose.yml ...`.
 
-## Container / Volume Management Commands
+## Useful Commands
 ### Containers
-- Status:
-  - `docker ps`
-- Logs:
-  - `docker logs -f nginx`
-  - `docker logs -f wordpress`
-  - `docker logs -f mariadb`
-- Shell inside a container:
-  - `docker exec -it nginx sh`
-  - `docker exec -it wordpress sh`
-  - `docker exec -it mariadb sh`
+- Status: `docker ps`
+- Logs: `docker logs nginx`, `docker logs wordpress`, `docker logs mariadb`
+- Shell access: `docker exec -it nginx sh`, `docker exec -it wordpress sh`, `docker exec -it mariadb sh`
 
 ### Compose
-- View resolved config (handy for debugging env/secrets):
-  - `docker compose -f srcs/docker-compose.yml config`
-- Restart a single service:
-  - `docker compose -f srcs/docker-compose.yml restart wordpress`
+- View the resolved configuration: `docker compose -f srcs/docker-compose.yml config`
+- Restart a single service: `docker compose -f srcs/docker-compose.yml restart wordpress`
 
-### Volumes and persistent data
-This project declares volumes with `driver: local` and bind-mounts them to host paths:
+## Persistence Model
+The project uses named volumes with bind mount driver options so the host filesystem stores the data directly:
 
-- `wordpress_data` → `/home/mobouifr/data/www` (mounted to `/var/www/html`)
-- `db_data` → `/home/mobouifr/data/mariadb` (mounted to `/var/lib/mysql`)
+- `wordpress_data` -> `/home/mobouifr/data/www` -> `/var/www/html`
+- `db_data` -> `/home/mobouifr/data/mariadb` -> `/var/lib/mysql`
 
-Inspect volume metadata:
-- `docker volume inspect wordpress_data`
-- `docker volume inspect db_data`
-
-Clean-up commands are available:
-- `make clean` (stops stack, prunes unused volumes)
-- `make fclean` (full prune + deletes `/home/mobouifr/data/*` content; destructive)
-
-## Data Persistence Model
-- **Database persistence**: MariaDB keeps data under `/var/lib/mysql` which is bind-mounted to `/home/mobouifr/data/mariadb`.
-- **WordPress persistence**: WP files under `/var/www/html` are bind-mounted to `/home/mobouifr/data/www`.
-
-Because persistence is on the host filesystem, rebuilding images does not wipe site content unless you run `make fclean`.
+Because persistence lives on the host, rebuilding images does not erase content unless the host data directories are removed.
 
 ## Project Layout
-- `srcs/`:
-  - `docker-compose.yml`: service definitions (nginx, wordpress, mariadb)
-  - `.env`: environment variables used by Compose
-  - `requirements/`: Docker build contexts for each service
-- `secrets/`:
-  - password files loaded as Docker secrets
+- `srcs/docker-compose.yml`: service definitions for NGINX, WordPress, and MariaDB
+- `srcs/requirements/nginx/`: NGINX Dockerfile and TLS configuration
+- `srcs/requirements/wordpress/`: WordPress + PHP-FPM Dockerfile and setup scripts
+- `srcs/requirements/mariadb/`: MariaDB Dockerfile and initialization scripts
+- `secrets/`: runtime secret files mounted into the containers
 
-## Design Notes (as implemented)
-- **Network**: a dedicated bridge network (`my-net`) isolates the stack and allows service discovery by container name.
-- **Secrets**: passwords are supplied via secrets files rather than inline environment variables.
-- **Storage**: bind-mounted host directories are used for persistence to make data easy to inspect and survive container recreation.
+## Design Notes
+- Network isolation comes from the custom bridge network `my-net`; services discover each other by name.
+- Sensitive values are kept in Docker secrets instead of inline environment variables.
+- Persistent data uses host-backed named volumes so the state survives container recreation.
+- NGINX is the only public entrypoint and should remain the only service publishing a host port.
