@@ -58,7 +58,7 @@ In this repository, Compose volumes are configured as **bind mounts** (via `driv
 2. Copy the example secrets and fill in your own values:
 	cp -r secrets.example/ secrets/
 	Open each file inside secrets/ and replace the placeholder with any value you want.
-	For local testing, anything works - e.g. just type "password123".
+	For local testing, anything works — e.g. just type "password123".
 
 3. Build and run the stack:
 	make
