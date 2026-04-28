@@ -1,163 +1,182 @@
 *This project has been created as part of the 42 curriculum by mobouifr.*
 
+<div align="center">
+
 # Inception
 
-[![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/get-started/)
-[![Docker Compose](https://img.shields.io/badge/Docker%20Compose-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/compose-file/)
-[![NGINX](https://img.shields.io/badge/NGINX-009639?logo=nginx&logoColor=white)](https://nginx.org/en/docs/)
-[![WordPress](https://img.shields.io/badge/WordPress-21759B?logo=wordpress&logoColor=white)](https://wordpress.org/documentation/)
-[![MariaDB](https://img.shields.io/badge/MariaDB-003545?logo=mariadb&logoColor=white)](https://mariadb.com/kb/en/documentation/)
-[![Debian](https://img.shields.io/badge/Debian-A81D33?logo=debian&logoColor=white)](https://www.debian.org/)
-[![Make](https://img.shields.io/badge/Make-6D00CC?logo=gnu&logoColor=white)](https://www.gnu.org/software/make/)
-[![Shell/Bash](https://img.shields.io/badge/Shell%2FBash-4EAA25?logo=gnu-bash&logoColor=white)](https://www.gnu.org/software/bash/)
-[![Last Commit](https://img.shields.io/github/last-commit/mobouifr/inception)](https://github.com/mobouifr/inception)
+**A production-like web infrastructure built with Docker and Docker Compose.**
 
-This project builds a small but production-like web infrastructure with Docker and Docker Compose. It runs inside a Linux virtual machine and separates the stack into three dedicated services: NGINX for HTTPS termination and reverse proxying, WordPress with PHP-FPM for the application layer, and MariaDB for the database.
+*Three services. One network. Zero hardcoded secrets.*
 
-## Table of Contents
-- [Description](#description)
-- [Instructions](#instructions)
-- [Design Choices](#design-choices)
-- [Project Structure](#project-structure)
-- [Configuration](#configuration)
-- [Resources](#resources)
-- [More Documentation](#more-documentation)
+[![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://docs.docker.com/get-started/)
+[![NGINX](https://img.shields.io/badge/NGINX-009639?style=for-the-badge&logo=nginx&logoColor=white)](https://nginx.org/en/docs/)
+[![WordPress](https://img.shields.io/badge/WordPress-21759B?style=for-the-badge&logo=wordpress&logoColor=white)](https://wordpress.org/documentation/)
+[![MariaDB](https://img.shields.io/badge/MariaDB-003545?style=for-the-badge&logo=mariadb&logoColor=white)](https://mariadb.com/kb/en/documentation/)
+[![42](https://img.shields.io/badge/42-1337-000000?style=for-the-badge)](https://42.fr)
+
+</div>
 
 ---
 
-## Description
-Inception is a 42 system administration project focused on building a clean, reproducible infrastructure with containers. The goal is to package each service from scratch, connect them through a private Docker network, keep persistent data on the host, and manage secrets without hardcoding them into images or Compose files.
+## What is this?
 
-### At a Glance
-- **Goal:** run a complete web stack that feels close to production while staying small and easy to rebuild.
-- **Front door:** NGINX is the only public entrypoint and listens on port `443` only.
-- **Application:** WordPress runs with PHP-FPM and no NGINX inside the container.
-- **Database:** MariaDB stores the WordPress data.
-- **Secrets:** passwords are provided through Docker secrets mounted from host files.
-- **Persistence:** site files and database data live under `/home/mobouifr/data/`.
+Inception is a 42 system administration project about building a reproducible, container-based web infrastructure from scratch — no pre-built images, no shortcuts. Each service is defined in its own `Dockerfile`, wired together with Docker Compose, and isolated on a private bridge network.
+
+The stack is minimal but deliberately close to how real infrastructure works: NGINX handles HTTPS termination and proxying, WordPress runs with PHP-FPM behind it, and MariaDB stores the data. Secrets are mounted at runtime, not baked into images. Persistent data survives container restarts.
+
+> The subject is about service composition, isolation, and reproducible rebuilds — not about emulating whole operating systems.
 
 ---
 
-## Instructions
-### Prerequisites
+## Stack
+
+| Layer | Service | Role |
+|---|---|---|
+| Entry point | NGINX | HTTPS termination, reverse proxy — port `443` only |
+| Application | WordPress + PHP-FPM | CMS — no NGINX inside the container |
+| Database | MariaDB | Stores all WordPress data |
+| Secrets | Docker secrets | Passwords mounted from host files at runtime |
+| Persistence | Named volumes | Data lives under `/home/mobouifr/data/` |
+
+---
+
+## Getting started
+
+### Requirements
+
 - Docker Engine
 - Docker Compose v2
 - GNU Make
 - A Linux virtual machine
 
 ### Setup
-1. Clone the repository.
 
-2. Copy the example secrets folder into a git-ignored `secrets/` directory.
+```bash
+# 1. Clone the repository
+git clone https://github.com/mobouifr/inception.git
+cd inception
 
-```sh
+# 2. Create your secrets from the example
 cp -r secrets.example/ secrets/
-```
+# Open every file in secrets/ and replace the placeholders
 
-3. Open every file inside `secrets/` and replace the placeholder values with your own.
-
-4. Add the domain to `/etc/hosts` so it resolves locally.
-
-```sh
+# 3. Add the domain to /etc/hosts
 echo "127.0.0.1 mobouifr.42.fr" | sudo tee -a /etc/hosts
-```
 
-5. Build and start the stack.
-
-```sh
+# 4. Build and start
 make
 ```
 
-6. Open the site in your browser.
-
-```text
+Then open:
+```
 https://mobouifr.42.fr
 https://mobouifr.42.fr/wp-admin
 ```
 
-### Makefile Commands
-```sh
-make          # first build and run
-make down     # stop all containers
-make restart  # restart the stack
-make rebuild  # full teardown + rebuild
-```
+### Makefile rules
 
-> Important:
-> - The `secrets/` directory is git-ignored and must be created from `secrets.example/`.
-> - The WordPress admin username must not contain `admin` or `administrator`.
-> - NGINX is the only entrypoint, it publishes port `443` only, and TLS is restricted to TLSv1.2 and TLSv1.3.
+| Rule | Effect |
+|---|---|
+| `make` | First build and start the stack |
+| `make down` | Stop all containers |
+| `make restart` | Restart the stack |
+| `make rebuild` | Full teardown and rebuild |
 
----
-
-## Design Choices
-### Virtual Machines vs Docker
-- **Virtual Machines** virtualize hardware and run a full guest OS. They are heavier, slower to boot, and usually best when you need strong OS-level isolation.
-- **Docker** shares the host kernel and packages only the application plus its dependencies. It is lighter, starts faster, and is better suited to composing several services.
-- **This project** uses Docker because the subject is about service composition, isolation, and repeatable rebuilds, not about emulating whole operating systems.
-
-### Secrets vs Environment Variables
-- **Environment variables** are convenient for non-sensitive settings, but they are easier to expose through process inspection, logs, shell history, or crash output.
-- **Docker secrets** keep sensitive values in files managed at runtime and mount them into the container under `/run/secrets/`.
-- **This project** stores MariaDB and WordPress passwords in `secrets/` on the host and injects them as Compose secrets.
-
-### Docker Network vs Host Network
-- **Docker bridge networks** isolate services from the host network and provide internal DNS, so containers can reach each other by service name.
-- **Host networking** removes that isolation and is not used here because the subject forbids it and it exposes too much of the host network namespace.
-- **This project** uses the custom bridge network `my-net`, which keeps the stack private while still letting NGINX, WordPress, and MariaDB talk to each other.
-
-### Docker Volumes vs Bind Mounts
-- **Docker volumes** are managed by Docker and abstract the host filesystem layout.
-- **Bind mounts** map a specific host path into a container and make the stored data easy to inspect, but they depend on the chosen host path.
-- **This project** uses named volumes with bind mount driver options so the data persists under `/home/mobouifr/data/www` and `/home/mobouifr/data/mariadb`.
+> `secrets/` is git-ignored and must be created from `secrets.example/` before building.
+> The WordPress admin username must not contain `admin` or `administrator`.
 
 ---
 
-## Project Structure
-```text
-.
-├── Makefile                  # Build, run, stop, rebuild commands
-├── secrets/                  # Git-ignored - contains real secret files
-├── secrets.example/          # Committed - placeholder files to copy and fill
-│   ├── credentials.txt
-│   ├── db_password.txt
-│   ├── db_root_password.txt
-│   ├── wp_admin_password.txt
-│   └── wp_user_password.txt
-└── srcs/
-    ├── docker-compose.yml    # Defines all services, volumes, network, secrets
-    ├── .env                  # Local non-sensitive config (git-ignored)
-    └── requirements/
-        ├── nginx/            # NGINX Dockerfile + SSL config
-        ├── wordpress/        # WordPress + PHP-FPM Dockerfile + setup scripts
-        └── mariadb/          # MariaDB Dockerfile + init scripts
-```
+## Design choices
+
+<details>
+<summary>Virtual machines vs Docker</summary>
+<br/>
+
+Virtual machines virtualize hardware and run a full guest OS — heavier, slower to boot, better when you need OS-level isolation. Docker shares the host kernel and packages only the application and its dependencies. Lighter, faster, and better suited to composing several services. This project uses Docker because the subject is about service composition and repeatable rebuilds, not OS emulation.
+
+</details>
+
+<details>
+<summary>Secrets vs environment variables</summary>
+<br/>
+
+Environment variables are easy to expose through process inspection, logs, shell history, or crash output. Docker secrets keep sensitive values in files managed at runtime, mounted into the container under `/run/secrets/`. This project stores all passwords in `secrets/` on the host and injects them as Compose secrets — nothing sensitive ever touches an image or a Compose file directly.
+
+</details>
+
+<details>
+<summary>Docker network vs host network</summary>
+<br/>
+
+Host networking removes container isolation and exposes too much of the host network namespace. Docker bridge networks isolate services from the host and provide internal DNS — containers reach each other by service name. This project uses the custom bridge network `my-net`, which keeps the stack private while letting NGINX, WordPress, and MariaDB communicate internally.
+
+</details>
+
+<details>
+<summary>Named volumes vs bind mounts</summary>
+<br/>
+
+Docker volumes are managed by Docker and abstract the host filesystem. Bind mounts map a specific host path into a container — the stored data is easy to inspect but depends on the chosen path. This project uses named volumes with bind mount driver options, so data persists under `/home/mobouifr/data/www` and `/home/mobouifr/data/mariadb` and remains accessible on the host.
+
+</details>
 
 ---
 
 ## Configuration
-If you keep non-sensitive Compose values in a local `srcs/.env` file, these are the main variables:
 
-| Variable | Example Value | Description |
-| --- | --- | --- |
+Non-sensitive values go in a local `srcs/.env` file (git-ignored):
+
+| Variable | Example | Description |
+|---|---|---|
 | `DOMAIN_NAME` | `mobouifr.42.fr` | Domain pointing to the WordPress site |
 | `MYSQL_DATABASE` | `wordpress` | WordPress database name |
 | `MYSQL_USER` | `wpuser` | MariaDB user for WordPress |
 | `WP_TITLE` | `My Inception Blog` | WordPress site title |
 
+Sensitive values go in `secrets/` — one file per secret, never committed:
+
+```
+secrets/
+├── credentials.txt
+├── db_password.txt
+├── db_root_password.txt
+├── wp_admin_password.txt
+└── wp_user_password.txt
+```
+
+---
+
+## Project structure
+
+```
+inception/
+│
+├── Makefile
+├── secrets.example/          ← committed placeholder files — copy and fill
+│   ├── credentials.txt
+│   ├── db_password.txt
+│   ├── db_root_password.txt
+│   ├── wp_admin_password.txt
+│   └── wp_user_password.txt
+│
+└── srcs/
+    ├── docker-compose.yml    ← services, volumes, network, secrets
+    ├── .env                  ← local non-sensitive config (git-ignored)
+    └── requirements/
+        ├── nginx/            ← Dockerfile + TLS config
+        ├── wordpress/        ← Dockerfile + PHP-FPM + setup scripts
+        └── mariadb/          ← Dockerfile + init scripts
+```
+
 ---
 
 ## Resources
-- Docker overview: https://docs.docker.com/get-started/
-- Docker Compose file reference: https://docs.docker.com/compose/compose-file/
-- Docker secrets (Compose): https://docs.docker.com/compose/use-secrets/
-- NGINX documentation: https://nginx.org/en/docs/
-- WordPress documentation: https://wordpress.org/documentation/
-- MariaDB documentation: https://mariadb.com/kb/en/documentation/
-- AI usage: AI was used to improve documentation structure, clarity, and the explanation of design trade-offs. The implementation itself remains the source of truth in `srcs/` and `secrets/`.
 
----
-
-## More Documentation
-- User guide: [USER_DOC.md](USER_DOC.md)
-- Developer guide: [DEV_DOC.md](DEV_DOC.md)
+- [Docker overview](https://docs.docker.com/get-started/)
+- [Docker Compose file reference](https://docs.docker.com/compose/compose-file/)
+- [Docker secrets with Compose](https://docs.docker.com/compose/use-secrets/)
+- [NGINX documentation](https://nginx.org/en/docs/)
+- [WordPress documentation](https://wordpress.org/documentation/)
+- [MariaDB documentation](https://mariadb.com/kb/en/documentation/)
+- [USER_DOC.md](USER_DOC.md) · [DEV_DOC.md](DEV_DOC.md)
